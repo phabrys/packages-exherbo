@@ -1,0 +1,58 @@
+# Copyright 2009 Saleem Abdulrasool <compnerd@compnerd.org>
+# Distributed under the terms of the GNU General Public License v2
+
+require gsettings
+require flag-o-matic
+require toolchain-funcs
+myexparam required_gcc=4.7
+
+export_exlib_phases src_prepare src_install
+
+SUMMARY="GTK+ 3 Web Browser Engine based on WebKit"
+HOMEPAGE="https://webkit.org"
+
+DOWNLOADS="https://webkitgtk.org/releases/webkitgtk-${PV}.tar.xz"
+
+LICENCES="LGPL-2 LGPL-2.1 BSD-3"
+
+webkit_src_prepare() {
+    local required_gcc
+
+    exparam -v required_gcc required_gcc
+    if cc-is-gcc ; then
+        ever at_least ${required_gcc} $(gcc-version) ||
+            die "GCC[>=${required_gcc}] required to build ${PN} (use \`eclectic gcc' to change the active compiler)"
+    fi
+
+    # NOTE(compnerd) tweak compilation options for memory
+    # This is particularly important after 1.10 as the build has gotten to the point where it
+    # will start hitting 4GB limitations on 32-bit platforms otherwise
+
+    # reducing the debug symbols to minimum makes a *significant* impact
+    # ar has started hitting 4G limitations in certain cases
+    # https://bugs.webkit.org/show_bug.cgi?id=91154
+    [[ " ${CXXFLAGS} " == *\ -g* ]] && append-flags -g1
+
+    # https://bugs.webkit.org/show_bug.cgi?id=135936
+    # build fails if optimizing but NDEBUG undefined
+    if ever at_least 2.6; then
+        [[ " ${CXXFLAGS} " == *\ -O* && " ${CXXFLAGS} " != *\ -O0* ]] && append-flags -DNDEBUG
+    fi
+
+    # attempt to reduce memory usage during the linking phase
+    append-ldflags -Wl,--no-keep-memory
+    [[ $(eclectic ld show) == bfd ]] && append-ldflags -Wl,--reduce-memory-overheads
+
+    # because we must stuff everything into an exlib
+    if ever at_least 2.20.2 ; then
+        cmake_src_prepare
+    else
+        default
+    fi
+}
+
+webkit_src_install() {
+    gsettings_src_install
+    edo find "${IMAGE}" -depth -type d -empty -delete
+}
+

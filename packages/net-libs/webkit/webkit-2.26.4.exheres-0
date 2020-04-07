@@ -1,0 +1,172 @@
+# Copyright 2008 Saleem Abdulrasool <compnerd@compnerd.org>
+# Copyright 2017 Rasmus Thomsen <Rasmus.thomsen@protonmail.com>
+# Distributed under the terms of the GNU General Purpose License v2
+
+require cmake [ api=2 ] webkit [ required_gcc='6.0' ]
+require utf8-locale
+
+SLOT="4.0"
+PLATFORMS="~amd64 ~x86"
+MYOPTIONS="
+    gobject-introspection
+    gtk-doc
+    hyphen [[ description = [ Enable hyphenation using libhyphen ] ]]
+    jpeg2000 [[ description = [ Support for the JPEG2000 images ] ]]
+    libnotify
+    nsplugin [[ description = [ Build the Netscape plugin API ( required for nsplugin support) ] ]]
+    opengl [[ description = [ Enable OpenGL & WebGL support ] ]]
+    spell
+    X
+    wayland
+    ( providers: ijg-jpeg jpeg-turbo ) [[ number-selected = exactly-one ]]
+    ( linguas: ar as bg cs de el en_CA en_GB eo es et eu fr gl gu he hi hu id it kn ko lt lv ml mr
+               nb nl or pa pl pt pt_BR ro ru sl sr sr@latin sv ta te uk vi zh_CN )
+    ( platform: amd64 )
+"
+
+RESTRICT="test" # requires X
+
+DEPENDENCIES="
+    build:
+        dev-lang/perl:*[>=5.10.0]
+        dev-lang/python:*[>=2.7.0]
+        dev-lang/ruby:*[>=1.9]
+        dev-util/gperf[>=3.0.1]
+        sys-devel/gettext
+        sys-devel/ninja
+        virtual/pkg-config[>=0.20]
+        gtk-doc? ( dev-doc/gtk-doc[>=1.10] )
+    build+run:
+        dev-db/sqlite:3[>=3.0]
+        dev-libs/at-spi2-core[>=2.6.2][X?]
+        dev-libs/atk[>=2.16.0]
+        dev-libs/glib:2[>=2.44.0] [[ note = [ 2.44 for glib networking ] ]]
+        dev-libs/icu:=
+        dev-libs/libgcrypt[>=1.6.0]
+        dev-libs/libsecret:1
+        dev-libs/libxml2:2.0[>=2.8.0]
+        dev-libs/libxslt[>=1.1.7]
+        gnome-desktop/libgudev
+        gnome-desktop/libsoup:2.4[>=2.54.0][gobject-introspection?]
+        media-libs/fontconfig[>=2.8.0]
+        media-libs/freetype:2[>=2.4.2]
+        media-libs/gstreamer:1.0[>=1.10.0]
+        media-libs/libpng:=[>=1.2]
+        media-libs/libwebp:=
+        media-plugins/gst-plugins-base:1.0[>=1.10.0][X?][wayland?]
+        media-plugins/gst-plugins-bad:1.0[>=1.10.0]
+        sys-apps/bubblewrap
+        sys-apps/xdg-dbus-proxy
+        sys-libs/libseccomp
+        sys-libs/zlib
+        x11-dri/mesa[X?][wayland?]
+        x11-libs/cairo[>=1.16][X?]
+        x11-libs/gtk+:3[>=3.22.0][gobject-introspection?][X?][wayland?]
+        x11-libs/harfbuzz[>=0.9.7]
+        x11-libs/pango[>=1.32.0]
+        gobject-introspection? ( gnome-desktop/gobject-introspection:1[>=1.32.0] )
+        hyphen? ( office-libs/hyphen )
+        jpeg2000? ( media-libs/OpenJPEG:2[>=2.2.0] )
+        libnotify? ( x11-libs/libnotify )
+        opengl? ( media-plugins/gst-plugins-base:1.0[gstreamer_plugins:opengl] )
+        spell? ( app-spell/enchant:0[>=0.22] )
+        X? (
+            x11-libs/libXcomposite
+            x11-libs/libXdamage
+            x11-libs/libXrender
+            x11-libs/libXt
+        )
+        wayland? (
+            sys-libs/wayland
+            sys-libs/wayland-protocols
+        )
+        providers:ijg-jpeg? ( media-libs/jpeg:=[>=6b] )
+        providers:jpeg-turbo? ( media-libs/libjpeg-turbo )
+    run:
+        gps/geoclue:2.0
+"
+
+CMAKE_SOURCE="${WORKBASE}/webkitgtk-${PV}/"
+
+# ENABLE_ACCELERATED_2D_CANVAS
+#   conflicts with ENABLE_GLES2
+# ENABLE_DATA_TRANSFER_ITEMS
+# ENABLE_INPUT_TYPE_COLOR
+# ENABLE_INPUT_TYPE_DATE
+# ENABLE_INPUT_TYPE_DATETIMELOCAL
+# ENABLE_INPUT_TYPE_MONTH
+# ENABLE_INPUT_TYPE_TIME
+# ENABLE_INPUT_TYPE_WEEK
+# ENABLE_MEDIA_STATISTICS
+# ENABLE_SCRIPTED_SPEECH
+# ENABLE_TEXT_AUTOSIZING
+# ENABLE_WEBASSEMBLY
+#   disabled by default upstream
+# USE_SYSTEM_MALLOC
+#   disabled by default upstream
+#   NOTE(compnerd) DO NOT PROVIDE AN OPTION FOR THIS (bmalloc is only disabled on android)
+# ENABLE_CSS_COMPOSITING
+# ENABLE_DEVICE_ORIENTATION
+# ENABLE_ORIENTATION_EVENTS
+#   only enabled on iOS builds
+# ENABLE_MOUSE_CURSOR_SCALE
+# ENABLE_TOUCH_SLIDER
+#   only enabled on enlightenment builds
+#   TODO(compnerd) determine what these do
+# ENABLE_FTPDIR
+# ENABLE_INDEXED_DATABASE_IN_WORKERS
+#   disabled by default in GTK+ port
+# ENABLE_WEBGPU
+#   New alternative to WebGL, experimental
+# ENABLE_WEBGL2
+#   fails to build as of 2.24.1
+# DENABLE_MEDIA_STREAM:BOOL=OFF
+# DENABLE_WEB_RTC:BOOL=OFF
+#   Requires unpackaged OpenWebRTC
+
+CMAKE_SRC_CONFIGURE_PARAMS=(
+    -DENABLE_BUBBLEWRAP_SANDBOX:BOOL=ON
+    -DENABLE_VIDEO:BOOL=ON
+    -DENABLE_WEB_AUDIO:BOOL=ON
+    -DENABLE_WEB_CRYPTO:BOOL=ON
+    -DENABLE_WEBDRIVER:BOOL=ON
+    -DENABLE_XSLT:BOOL=ON
+    -DPORT=GTK
+    -DUSE_LD_GOLD:BOOL=OFF
+    -DUSE_LIBSECRET:BOOL=ON
+
+    # Needs unpackaged libwpe
+    -DUSE_WPE_RENDERER:BOOL=OFF
+    # Needs unpackaged woff2
+    -DUSE_WOFF2:BOOL=OFF
+)
+CMAKE_SRC_CONFIGURE_OPTION_ENABLES=(
+    'gobject-introspection INTROSPECTION'
+    'gtk-doc GTKDOC'
+    'nsplugin NETSCAPE_PLUGIN_API'
+    # OPENGL will enable GLES2 if OpenGL lib is not found
+    'opengl OPENGL'
+    'opengl WEBGL'
+    'platform:amd64 FTL_JIT'
+    'spell SPELLCHECK'
+    'X X11_TARGET'
+    'wayland WAYLAND_TARGET'
+)
+CMAKE_SRC_CONFIGURE_OPTION_USES=(
+    'hyphen LIBHYPHEN'
+    'jpeg2000 OPENJPEG'
+    'libnotify LIBNOTIFY'
+    'opengl GSTREAMER_GL'
+)
+
+pkg_setup() {
+    # Required to prevent UnicodeDecodeError when executing `cssmin.py` script
+    require_utf8_locale
+}
+
+src_install() {
+    cmake_src_install
+    edo mv "${IMAGE}"/usr/{$(exhost --target)/,}share/locale
+    edo rmdir "${IMAGE}"/usr/$(exhost --target)/share
+}
+
